@@ -1,4 +1,5 @@
 const express = require('express')
+require('dotenv').config()
 const cors = require('cors')
 const app = express()
 const { MongoClient, ServerApiVersion } = require('mongodb');
@@ -13,9 +14,9 @@ app.get('/', (req, res) => {
     res.send('Hello World!')
 })
 
-console.log(process.env.DB_USER);
-console.log(process.env.DB_PASS);
-const uri = `mongodb+srv://popularRestaurantDB:gjSPJEUAlQhbSUZ9@cluster0.nc6s3b6.mongodb.net/?retryWrites=true&w=majority`;
+// console.log(process.env.DB_USER);
+// console.log(process.env.DB_PASS);
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.nc6s3b6.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -32,9 +33,33 @@ async function run() {
         // await client.connect();
         const foodsCollections = client.db("restaurantDB").collection("foods")
         const reviewsCollections = client.db("restaurantDB").collection("reviews")
+        const usersCollections = client.db("restaurantDB").collection("users")
         app.get('/api/v1/foods', async (req, res) => {
+            console.log('req res', req.query.name);
             const result = await foodsCollections.find().toArray()
-            console.log(result);
+            console.log('result', result);
+            res.send(result)
+        })
+        // reviews
+        app.get('/api/v1/reviews', async (req, res) => {
+            console.log('req res', req.query.name);
+            const result = await reviewsCollections.find().toArray()
+            console.log('result', result);
+            res.send(result)
+        })
+
+        // users get
+        app.get('/api/v1/getUsers', async (req, res) => {
+            const result = await usersCollections.find().toArray()
+            console.log('result', result);
+            res.send(result)
+        })
+
+        // all users pos
+        app.post('/api/v1/users', async (req, res) => {
+            const user = req.body
+            const result = await usersCollections.insertOne(user)
+            console.log('result', result);
             res.send(result)
         })
 
