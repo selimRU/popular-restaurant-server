@@ -1,8 +1,9 @@
 const express = require('express')
 require('dotenv').config()
+const jwt = require('jsonwebtoken');
 const cors = require('cors')
 const app = express()
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000
 
 // popularRestaurantDB//gjSPJEUAlQhbSUZ9
@@ -34,32 +35,112 @@ async function run() {
         const foodsCollections = client.db("restaurantDB").collection("foods")
         const reviewsCollections = client.db("restaurantDB").collection("reviews")
         const usersCollections = client.db("restaurantDB").collection("users")
+        const cartsCollections = client.db("restaurantDB").collection("carts")
+
+        const verifyToken = (req, res, next) => {
+            if (!req.headers.authorization) {
+                res.status(401).send({ message: 'unathorized' })
+            }
+            const token = req.headers.authorization.split(' ')[1]
+            jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: 'Unathorized access' }) || res.status(403).send({ message: 'Forbiden access' })
+                }
+                req.decoded = decoded
+                next()
+            });
+        }
+
+
         app.get('/api/v1/foods', async (req, res) => {
             console.log('req res', req.query.name);
             const result = await foodsCollections.find().toArray()
-            console.log('result', result);
+            // console.log('result', result);
             res.send(result)
         })
         // reviews
         app.get('/api/v1/reviews', async (req, res) => {
             console.log('req res', req.query.name);
             const result = await reviewsCollections.find().toArray()
-            console.log('result', result);
+            // console.log('result', result);
+            res.send(result)
+        })
+
+        // get carts
+        app.get('/api/v1/getCarts', async (req, res) => {
+            const email = req.query.email
+            const query = { email: email }
+            const result = await cartsCollections.find(query).toArray()
+            // console.log('result', result);
+            res.send(result)
+        })
+        // delete cart
+        app.delete('/api/v1/deleteCarts/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await cartsCollections.deleteOne(query)
+            // console.log('result', result);
+            res.send(result)
+        })
+
+        // delete user
+        app.delete('/api/v1/deleteUser/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await usersCollections.deleteOne(query)
+            // console.log('result', result);
             res.send(result)
         })
 
         // users get
-        app.get('/api/v1/getUsers', async (req, res) => {
+        app.get('/api/v1/getUsers', verifyToken, async (req, res) => {
+
             const result = await usersCollections.find().toArray()
-            console.log('result', result);
+            // console.log('result', result);
             res.send(result)
         })
 
-        // all users pos
+        // all users post
+        app.post('/api/v1/jwt', async (req, res) => {
+            const user = req.body
+            const token = jwt.sign(
+                user,
+                process.env.ACCESS_TOKEN,
+                { expiresIn: '1h' });
+            // console.log('result', result);
+            res.send({ token })
+        })
+        // all users post
         app.post('/api/v1/users', async (req, res) => {
             const user = req.body
+            const query = { email: user.email }
+            const existingUser = await usersCollections.findOne(query)
+            if (existingUser) {
+                return res.send({ message: 'Already exists', insertedId: null })
+            }
             const result = await usersCollections.insertOne(user)
-            console.log('result', result);
+            // console.log('result', result);
+            res.send(result)
+        })
+
+        // all users update
+        app.patch('/api/v1/users/admin/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    role: 'admin'
+                },
+            }
+            const result = await usersCollections.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+
+        // all carts post
+        app.post('/api/v1/carts', async (req, res) => {
+            const user = req.body
+            const result = await cartsCollections.insertOne(user)
+            // console.log('result', result);
             res.send(result)
         })
 
