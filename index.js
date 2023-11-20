@@ -38,44 +38,58 @@ async function run() {
         const cartsCollections = client.db("restaurantDB").collection("carts")
 
         const verifyToken = (req, res, next) => {
+            console.log('headers', req.headers.authorization);
             if (!req.headers.authorization) {
-                res.status(401).send({ message: 'unathorized' })
+                return res.status(401).send({ message: 'Unauthorized' })
             }
             const token = req.headers.authorization.split(' ')[1]
+            console.log(token);
             jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
                 if (err) {
-                    return res.status(401).send({ message: 'Unathorized access' }) || res.status(403).send({ message: 'Forbiden access' })
+                    return res.status(401).send({ message: 'Unauthorized access' })
                 }
                 req.decoded = decoded
                 next()
             });
         }
 
+        // verify admin 
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await usersCollections.findOne(query)
+            const isAdmin = user?.role === 'admin'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'Forbiden access' })
+            }
+            next()
+        }
 
         app.get('/api/v1/foods', async (req, res) => {
-            console.log('req res', req.query.name);
+            // console.log('req res', req.query.name);
             const result = await foodsCollections.find().toArray()
             // console.log('result', result);
             res.send(result)
         })
         // reviews
         app.get('/api/v1/reviews', async (req, res) => {
-            console.log('req res', req.query.name);
+            // console.log('req res', req.query.name);
             const result = await reviewsCollections.find().toArray()
             // console.log('result', result);
             res.send(result)
         })
 
         // get carts
-        app.get('/api/v1/getCarts', async (req, res) => {
+        app.get('/api/v1/getCarts', verifyToken, async (req, res) => {
             const email = req.query.email
             const query = { email: email }
             const result = await cartsCollections.find(query).toArray()
             // console.log('result', result);
             res.send(result)
         })
+
         // delete cart
-        app.delete('/api/v1/deleteCarts/:id', async (req, res) => {
+        app.delete('/api/v1/deleteCarts/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
             const result = await cartsCollections.deleteOne(query)
@@ -84,7 +98,7 @@ async function run() {
         })
 
         // delete user
-        app.delete('/api/v1/deleteUser/:id', async (req, res) => {
+        app.delete('/api/v1/deleteUser/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
             const result = await usersCollections.deleteOne(query)
@@ -93,11 +107,27 @@ async function run() {
         })
 
         // users get
-        app.get('/api/v1/getUsers', verifyToken, async (req, res) => {
-
+        app.get('/api/v1/getUsers', verifyToken, verifyAdmin, async (req, res) => {
             const result = await usersCollections.find().toArray()
             // console.log('result', result);
             res.send(result)
+        })
+
+        // admin get
+        app.get('/api/v1/getUsers/admin/:email', verifyToken, async (req, res) => {
+            console.log('res', req.params.email, req.decoded.email);
+            const email = req.params.email
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: 'Access forbidden' })
+            }
+            const query = { email: email }
+            const user = await usersCollections.findOne(query)
+            let admin = false
+            if (user) {
+                admin = user.role === 'admin'
+            }
+            console.log('result', { admin });
+            res.send({ admin })
         })
 
         // all users post
@@ -124,7 +154,7 @@ async function run() {
         })
 
         // all users update
-        app.patch('/api/v1/users/admin/:id', async (req, res) => {
+        app.patch('/api/v1/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -140,6 +170,21 @@ async function run() {
         app.post('/api/v1/carts', async (req, res) => {
             const user = req.body
             const result = await cartsCollections.insertOne(user)
+            // console.log('result', result);
+            res.send(result)
+        })
+
+        // all item post
+        app.post('/api/v1/item', verifyToken, verifyAdmin, async (req, res) => {
+            const user = req.body
+            const result = await foodsCollections.insertOne(user)
+            // console.log('result', result);
+            res.send(result)
+        })
+        // all item update
+        app.post('/api/v1/item', verifyToken, verifyAdmin, async (req, res) => {
+            const user = req.body
+            const result = await foodsCollections.insertOne(user)
             // console.log('result', result);
             res.send(result)
         })
